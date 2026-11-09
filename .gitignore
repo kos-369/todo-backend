@@ -26,7 +26,16 @@ go.work
 go.work.sum
 
 # env file
-.env
+.env*
+!.env.example
+
+# Terraform
+*.tfstate*
+*.tfvars
+.terraform/
+
+# Private keys
+*.pem
 
 # Editor/IDE
 # .idea/
