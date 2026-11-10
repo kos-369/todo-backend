@@ -12,11 +12,14 @@ import (
 	"time"
 )
 
+// shutdownTimeout limits how long Shutdown waits for in-flight requests.
+// Keep it below the ECS stop timeout (30s by default).
 const shutdownTimeout = 10 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	// Cancel ctx on Ctrl+C (SIGINT) or when ECS stops the task (SIGTERM).
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -32,9 +35,14 @@ func main() {
 	}
 }
 
+// run serves HTTP until ctx is canceled, then shuts down gracefully.
+// Graceful shutdown lets in-flight requests finish, so deploys don't
+// cut off clients mid-request.
+// It takes a listener so tests can use a random port.
 func run(ctx context.Context, logger *slog.Logger, ln net.Listener, handler http.Handler) error {
 	srv := &http.Server{Handler: handler}
 
+	// Buffered so the goroutine can exit even if no one receives.
 	serveErr := make(chan error, 1)
 	go func() {
 		logger.Info("server starting", "addr", ln.Addr().String())
@@ -57,6 +65,7 @@ func run(ctx context.Context, logger *slog.Logger, ln net.Listener, handler http
 	return nil
 }
 
+// newHandler returns the HTTP routes.
 func newHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
