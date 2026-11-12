@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -23,7 +25,7 @@ func TestHealthz(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
 
-			newHandler().ServeHTTP(rec, req)
+			newHandler(fakePinger{}).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
@@ -33,5 +35,40 @@ func TestHealthz(t *testing.T) {
 			}
 		})
 	}
+}
 
+// fakePinger returns err from PingContext, standing in for the DB.
+type fakePinger struct {
+	err error
+}
+
+func (f fakePinger) PingContext(context.Context) error {
+	return f.err
+}
+
+func TestReadyz(t *testing.T) {
+	tests := []struct {
+		name       string
+		pingErr    error
+		wantStatus int
+		wantBody   string
+	}{
+		{"DB reachable", nil, http.StatusOK, "ok\n"},
+		{"DB unreachable", errors.New("connection refused"), http.StatusServiceUnavailable, "not ready\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+			rec := httptest.NewRecorder()
+
+			newHandler(fakePinger{err: tt.pingErr}).ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
+			}
+			if rec.Body.String() != tt.wantBody {
+				t.Errorf("body = %q, want %q", rec.Body.String(), tt.wantBody)
+			}
+		})
+	}
 }

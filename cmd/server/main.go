@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -16,6 +17,9 @@ import (
 // Keep it below the ECS stop timeout (30s by default).
 const shutdownTimeout = 10 * time.Second
 
+// readyzTimeout bounds the DB ping so /readyz answers quickly even if the DB hangs.
+const readyzTimeout = 2 * time.Second
+
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -29,7 +33,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := run(ctx, logger, ln, newHandler()); err != nil {
+	if err := run(ctx, logger, ln, newHandler(noDB{})); err != nil {
 		logger.Error("server stopped with error", "error", err)
 		os.Exit(1)
 	}
@@ -65,11 +69,38 @@ func run(ctx context.Context, logger *slog.Logger, ln net.Listener, handler http
 	return nil
 }
 
+// pinger is the part of *sql.DB that /readyz needs, so tests can pass a fake.
+type pinger interface {
+	PingContext(ctx context.Context) error
+}
+
+// noDB stands in until the real DB is wired in. /readyz returns 503 with it.
+type noDB struct{}
+
+func (noDB) PingContext(context.Context) error {
+	return errors.New("database not configured")
+}
+
 // newHandler returns the HTTP routes.
-func newHandler() http.Handler {
+func newHandler(db pinger) http.Handler {
 	mux := http.NewServeMux()
+
+	// Liveness: the process is up. It doesn't check the DB, so a DB outage
+	// doesn't make ECS restart healthy tasks.
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "ok")
 	})
+
+	// Readiness: the DB is reachable.
+	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), readyzTimeout)
+		defer cancel()
+		if err := db.PingContext(ctx); err != nil {
+			http.Error(w, "not ready", http.StatusServiceUnavailable)
+			return
+		}
+		fmt.Fprintln(w, "ok")
+	})
+
 	return mux
 }
