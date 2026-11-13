@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"net"
@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 // shutdownTimeout limits how long Shutdown waits for in-flight requests.
@@ -27,13 +29,27 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	cfg, err := dbConfigFromEnv()
+	if err != nil {
+		logger.Error("invalid DB config", "error", err)
+		os.Exit(1)
+	}
+	connector, err := mysql.NewConnector(cfg)
+	if err != nil {
+		logger.Error("invalid DB config", "error", err)
+		os.Exit(1)
+	}
+	// OpenDB doesn't connect yet, so the server starts even if the DB is down.
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
 	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		logger.Error("failed to listen", "error", err)
 		os.Exit(1)
 	}
 
-	if err := run(ctx, logger, ln, newHandler(noDB{})); err != nil {
+	if err := run(ctx, logger, ln, newHandler(logger, db)); err != nil {
 		logger.Error("server stopped with error", "error", err)
 		os.Exit(1)
 	}
@@ -74,15 +90,8 @@ type pinger interface {
 	PingContext(ctx context.Context) error
 }
 
-// noDB stands in until the real DB is wired in. /readyz returns 503 with it.
-type noDB struct{}
-
-func (noDB) PingContext(context.Context) error {
-	return errors.New("database not configured")
-}
-
 // newHandler returns the HTTP routes.
-func newHandler(db pinger) http.Handler {
+func newHandler(logger *slog.Logger, db pinger) http.Handler {
 	mux := http.NewServeMux()
 
 	// Liveness: the process is up. It doesn't check the DB, so a DB outage
@@ -96,6 +105,8 @@ func newHandler(db pinger) http.Handler {
 		ctx, cancel := context.WithTimeout(r.Context(), readyzTimeout)
 		defer cancel()
 		if err := db.PingContext(ctx); err != nil {
+			// Log the cause; don't send DB details to the client.
+			logger.Warn("readyz: DB ping failed", "error", err)
 			http.Error(w, "not ready", http.StatusServiceUnavailable)
 			return
 		}
