@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,7 +26,7 @@ func TestHealthz(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
 
-			newHandler(fakePinger{}).ServeHTTP(rec, req)
+			newHandler(slog.New(slog.DiscardHandler), fakePinger{}).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
@@ -61,7 +62,7 @@ func TestReadyz(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
 
-			newHandler(fakePinger{err: tt.pingErr}).ServeHTTP(rec, req)
+			newHandler(slog.New(slog.DiscardHandler), fakePinger{err: tt.pingErr}).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
