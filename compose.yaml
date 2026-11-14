@@ -19,5 +19,20 @@ services:
       timeout: 3s
       retries: 20
 
+  # Applies db/migrations. Run with: docker compose run --rm migrate up
+  migrate:
+    image: migrate/migrate:v4.20.1
+    # Only runs when called explicitly, not on `docker compose up`.
+    profiles: ["tools"]
+    volumes:
+      - ./db/migrations:/migrations:ro
+    entrypoint:
+      - migrate
+      - -path=/migrations
+      - -database=mysql://todo:${MYSQL_PASSWORD:?set it in .env}@tcp(db:3306)/todo
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   db-data:
