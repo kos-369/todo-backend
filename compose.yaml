@@ -34,5 +34,13 @@ services:
       db:
         condition: service_healthy
 
+  # Generates Go code from db/queries. Run with: docker compose run --rm sqlc generate
+  sqlc:
+    image: sqlc/sqlc:1.31.1
+    profiles: ["tools"]
+    volumes:
+      - .:/src
+    working_dir: /src
+
 volumes:
   db-data:
