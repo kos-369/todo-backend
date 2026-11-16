@@ -1,0 +1,50 @@
+openapi: 3.0.3
+info:
+  title: Todo API
+  version: 0.1.0
+paths:
+  /api/todos:
+    get:
+      operationId: listTodos
+      summary: List todos, newest first
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoList"
+components:
+  schemas:
+    TodoList:
+      type: object
+      required: [todos]
+      properties:
+        todos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Todo"
+    Todo:
+      type: object
+      required: [id, title, description, completed, dueDate, createdAt, updatedAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        completed:
+          type: boolean
+        dueDate:
+          type: string
+          format: date
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

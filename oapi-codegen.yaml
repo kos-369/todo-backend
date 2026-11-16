@@ -1,0 +1,10 @@
+# Generates Go code from api/openapi.yaml.
+# Run with: go tool oapi-codegen -config oapi-codegen.yaml api/openapi.yaml
+package: oapigen
+output: internal/handler/internal/oapigen/oapigen.gen.go
+generate:
+  models: true
+  std-http-server: true
+  strict-server: true
+output-options:
+  name-normalizer: ToCamelCaseWithInitialisms
