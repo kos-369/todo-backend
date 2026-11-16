@@ -6,4 +6,4 @@ sql:
     gen:
       go:
         package: sqlcgen
-        out: internal/repository/sqlcgen
+        out: internal/repository/internal/sqlcgen

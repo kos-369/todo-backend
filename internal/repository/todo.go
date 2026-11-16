@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/kos-369/todo-backend/internal/repository/sqlcgen"
+	"github.com/kos-369/todo-backend/internal/repository/internal/sqlcgen"
 	"github.com/kos-369/todo-backend/internal/todo"
 )
 
