@@ -26,6 +26,8 @@ func dbConfigFromEnv() (*mysql.Config, error) {
 	cfg.User = get("DB_USER")
 	cfg.Passwd = get("DB_PASSWORD")
 	cfg.DBName = get("DB_NAME")
+	// Scan DATE and DATETIME columns into time.Time.
+	cfg.ParseTime = true
 
 	if err := errors.Join(errs...); err != nil {
 		return nil, err
