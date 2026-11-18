@@ -13,6 +13,10 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
+
+	"github.com/kos-369/todo-backend/internal/handler"
+	"github.com/kos-369/todo-backend/internal/repository"
+	"github.com/kos-369/todo-backend/internal/service"
 )
 
 // shutdownTimeout limits how long Shutdown waits for in-flight requests.
@@ -49,7 +53,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := run(ctx, logger, ln, newHandler(logger, db)); err != nil {
+	api := handler.New(service.NewTodoService(repository.NewTodoRepository(db)))
+	if err := run(ctx, logger, ln, newHandler(logger, db, api)); err != nil {
 		logger.Error("server stopped with error", "error", err)
 		os.Exit(1)
 	}
@@ -90,9 +95,10 @@ type pinger interface {
 	PingContext(ctx context.Context) error
 }
 
-// newHandler returns the HTTP routes.
-func newHandler(logger *slog.Logger, db pinger) http.Handler {
+// newHandler returns the HTTP routes. api serves everything under /api/.
+func newHandler(logger *slog.Logger, db pinger, api http.Handler) http.Handler {
 	mux := http.NewServeMux()
+	mux.Handle("/api/", api)
 
 	// Liveness: the process is up. It doesn't check the DB, so a DB outage
 	// doesn't make ECS restart healthy tasks.

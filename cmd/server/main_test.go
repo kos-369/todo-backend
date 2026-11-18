@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +27,7 @@ func TestHealthz(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
 
-			newHandler(slog.New(slog.DiscardHandler), fakePinger{}).ServeHTTP(rec, req)
+			newHandler(slog.New(slog.DiscardHandler), fakePinger{}, http.NotFoundHandler()).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
@@ -62,7 +63,7 @@ func TestReadyz(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
 
-			newHandler(slog.New(slog.DiscardHandler), fakePinger{err: tt.pingErr}).ServeHTTP(rec, req)
+			newHandler(slog.New(slog.DiscardHandler), fakePinger{err: tt.pingErr}, http.NotFoundHandler()).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
@@ -71,5 +72,20 @@ func TestReadyz(t *testing.T) {
 				t.Errorf("body = %q, want %q", rec.Body.String(), tt.wantBody)
 			}
 		})
+	}
+}
+
+func TestAPIRoutes(t *testing.T) {
+	// api stands in for the real API and reports that it was called.
+	api := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "api")
+	})
+	req := httptest.NewRequest(http.MethodGet, "/api/todos", nil)
+	rec := httptest.NewRecorder()
+
+	newHandler(slog.New(slog.DiscardHandler), fakePinger{}, api).ServeHTTP(rec, req)
+
+	if rec.Body.String() != "api" {
+		t.Errorf("body = %q, want %q", rec.Body.String(), "api")
 	}
 }
