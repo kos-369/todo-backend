@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -22,9 +21,6 @@ import (
 // shutdownTimeout limits how long Shutdown waits for in-flight requests.
 // Keep it below the ECS stop timeout (30s by default).
 const shutdownTimeout = 10 * time.Second
-
-// readyzTimeout bounds the DB ping so /readyz answers quickly even if the DB hangs.
-const readyzTimeout = 2 * time.Second
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -53,8 +49,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	api := handler.New(logger, db, service.NewTodoService(repository.NewTodoRepository(db)))
-	if err := run(ctx, logger, ln, newHandler(logger, db, api)); err != nil {
+	routes := handler.New(logger, db, service.NewTodoService(repository.NewTodoRepository(db)))
+	if err := run(ctx, logger, ln, routes); err != nil {
 		logger.Error("server stopped with error", "error", err)
 		os.Exit(1)
 	}
@@ -88,36 +84,4 @@ func run(ctx context.Context, logger *slog.Logger, ln net.Listener, handler http
 	}
 	logger.Info("server stopped")
 	return nil
-}
-
-// pinger is the part of *sql.DB that /readyz needs, so tests can pass a fake.
-type pinger interface {
-	PingContext(ctx context.Context) error
-}
-
-// newHandler returns the HTTP routes. api serves everything under /api/.
-func newHandler(logger *slog.Logger, db pinger, api http.Handler) http.Handler {
-	mux := http.NewServeMux()
-	mux.Handle("/api/", api)
-
-	// Liveness: the process is up. It doesn't check the DB, so a DB outage
-	// doesn't make ECS restart healthy tasks.
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "ok")
-	})
-
-	// Readiness: the DB is reachable.
-	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), readyzTimeout)
-		defer cancel()
-		if err := db.PingContext(ctx); err != nil {
-			// Log the cause; don't send DB details to the client.
-			logger.Warn("readyz: DB ping failed", "error", err)
-			http.Error(w, "not ready", http.StatusServiceUnavailable)
-			return
-		}
-		fmt.Fprintln(w, "ok")
-	})
-
-	return mux
 }
