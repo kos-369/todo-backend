@@ -53,7 +53,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	api := handler.New(service.NewTodoService(repository.NewTodoRepository(db)))
+	api := handler.New(logger, db, service.NewTodoService(repository.NewTodoRepository(db)))
 	if err := run(ctx, logger, ln, newHandler(logger, db, api)); err != nil {
 		logger.Error("server stopped with error", "error", err)
 		os.Exit(1)

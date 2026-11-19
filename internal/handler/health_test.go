@@ -9,11 +9,10 @@ import (
 	"testing"
 )
 
-// newHealthHandler returns a mux with only the health checks.
+// newHealthHandler returns all routes. The health checks don't use the
+// TodoService, so it is nil.
 func newHealthHandler(db Pinger) http.Handler {
-	mux := http.NewServeMux()
-	registerHealth(mux, slog.New(slog.DiscardHandler), db)
-	return mux
+	return New(slog.New(slog.DiscardHandler), db, nil)
 }
 
 func TestHealthz(t *testing.T) {

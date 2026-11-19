@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -66,7 +67,8 @@ func TestListTodos(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/api/todos", nil)
 			rec := httptest.NewRecorder()
 
-			handler.New(tt.svc).ServeHTTP(rec, req)
+			// The API doesn't use the Pinger, so it is nil.
+			handler.New(slog.New(slog.DiscardHandler), nil, tt.svc).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
