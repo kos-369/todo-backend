@@ -16,7 +16,7 @@ func TestDBConfigFromEnv(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := "todo:secret@tcp(127.0.0.1:3306)/todo"
+		want := "todo:secret@tcp(127.0.0.1:3306)/todo?parseTime=true"
 		if got := cfg.FormatDSN(); got != want {
 			t.Errorf("DSN = %q, want %q", got, want)
 		}

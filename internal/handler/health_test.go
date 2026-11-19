@@ -1,4 +1,4 @@
-package main
+package handler
 
 import (
 	"context"
@@ -8,6 +8,12 @@ import (
 	"net/http/httptest"
 	"testing"
 )
+
+// newHealthHandler returns all routes. The health checks don't use the
+// TodoService, so it is nil.
+func newHealthHandler(db Pinger) http.Handler {
+	return New(slog.New(slog.DiscardHandler), db, nil)
+}
 
 func TestHealthz(t *testing.T) {
 	tests := []struct {
@@ -26,7 +32,7 @@ func TestHealthz(t *testing.T) {
 			req := httptest.NewRequest(tt.method, tt.path, nil)
 			rec := httptest.NewRecorder()
 
-			newHandler(slog.New(slog.DiscardHandler), fakePinger{}).ServeHTTP(rec, req)
+			newHealthHandler(fakePinger{}).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
@@ -62,7 +68,7 @@ func TestReadyz(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
 
-			newHandler(slog.New(slog.DiscardHandler), fakePinger{err: tt.pingErr}).ServeHTTP(rec, req)
+			newHealthHandler(fakePinger{err: tt.pingErr}).ServeHTTP(rec, req)
 
 			if rec.Code != tt.wantStatus {
 				t.Errorf("status = %d, want %d", rec.Code, tt.wantStatus)
